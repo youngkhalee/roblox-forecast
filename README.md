@@ -14,30 +14,40 @@ game, plus a top-10 guess — scored against every hourly chart of the
 
 The forecast is a *time-averaged occupancy distribution* over the whole
 72-hour window, not a snapshot: the persistence assumption ("the chart
-will not move") decays within hours on this chart. Per game, from the
-history alone:
+will not move") decays within hours on this chart. Two models are
+ensembled (0.7 / 0.3), both built from the history alone, in hours:
 
+**K. A per-game kernel model.**
 - statistics are weighted by exponential decay in **hours** (archive
-  reads are hours apart, recorder reads hourly), half-life 16 h;
+  reads are hours apart, recorder reads hourly), half-life 11 h;
 - expected starting rank blends the last read's rank with the
-  recency-weighted mean rank, penalised for intermittent presence;
+  recency-weighted mean rank, penalised for intermittent presence,
+  nudged by the like ratio, and boosted for recently-first-seen games;
 - drift combines the rank slope with the log player-count slope (the
   chart is sorted by user growth);
-- over the window the expected rank mean-reverts toward the mid-chart
-  while the rank spread grows like sqrt(horizon); place probabilities
-  are normal rank-bin masses averaged over six horizon slices;
+- over the window the expected rank mean-reverts toward #20 while the
+  rank spread grows like sqrt(horizon), scaled per game by its own rank
+  volatility (sticky games sharper, volatile ones flatter); place
+  probabilities are normal rank-bin masses over six horizon slices;
 - games whose 28th day since creation falls inside the window (from
   games/v1 details, when the history carries them) contribute nothing
   after that day — the chart only lists games published in the last
-  28 days;
-- every place leaves 20% of its mass unnamed, which the scorer spreads
-  over chart games the forecast does not name — that is what covers
-  games that enter the chart during the window.
+  28 days.
 
-Tuning was by rolling-origin backtest on the kit history with the
-competition's own log-score rule: on origins with at least eight
-future reads this model averages about −40.2 against the persistence
-baseline's −50.5.
+**T. A rank-transition model.** From every pair of reads, the empirical
+transitions between rank states (1–30, 31–60, 61+/off-chart), binned by
+time gap and Dirichlet-smoothed; a game's forecast is its last state's
+transition row, time-averaged over the window. This captures how ranks
+actually diffuse on this chart, including re-entry from off-chart.
+
+Every place leaves 15% of its mass unnamed, which the scorer spreads
+over chart games the forecast does not name — that is what covers games
+that enter the chart during the window.
+
+Tuning was by rolling-origin backtest inside the kit history with the
+competition's own log-score rule: on origins with at least eight future
+reads this ensemble averages about −37.6, against −40.2 for the kernel
+alone and −50.5 for the persistence baseline.
 
 Pure Python 3 standard library, no network, deterministic: two runs on
 the same history write byte-identical output.
